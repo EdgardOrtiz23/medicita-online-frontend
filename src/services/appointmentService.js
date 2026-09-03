@@ -1,4 +1,42 @@
 const STORAGE_PREFIX = "medicita_appointments_";
+const GLOBAL_APPOINTMENTS_KEY = "medicita_global_appointments";
+
+// Citas de prueba iniciales para doctores
+const INITIAL_MOCK_APPOINTMENTS = [
+  {
+    id: "apt_101",
+    pacienteNombre: "Carlos Mendoza",
+    pacienteEmail: "carlos@gmail.com",
+    especialidad: "Medicina General",
+    medico: "Dra. Sofía Martínez",
+    fecha: "2026-09-10",
+    hora: "09:00",
+    motivo: "Chequeo de rutina y presión arterial.",
+    estado: "Pendiente",
+  },
+  {
+    id: "apt_102",
+    pacienteNombre: "Lucía Fernández",
+    pacienteEmail: "lucia@gmail.com",
+    especialidad: "Cardiología",
+    medico: "Dr. Roberto Gómez",
+    fecha: "2026-09-12",
+    hora: "10:30",
+    motivo: "Evaluación por taquicardias ocasionales.",
+    estado: "Pendiente",
+  },
+  {
+    id: "apt_103",
+    pacienteNombre: "Carlos Mendoza",
+    pacienteEmail: "carlos@gmail.com",
+    especialidad: "Pediatría",
+    medico: "Dra. Sofía Martínez",
+    fecha: "2026-09-15",
+    hora: "14:00",
+    motivo: "Consulta de seguimiento.",
+    estado: "Aceptada",
+  },
+];
 
 function getStorageKey(user) {
   const identity = user?.email || user?.name || "guest";
@@ -6,63 +44,84 @@ function getStorageKey(user) {
   return `${STORAGE_PREFIX}${normalized || "guest"}`;
 }
 
-function readAppointments(user) {
+export function getAllAppointmentsGlobal() {
   try {
-    const raw = localStorage.getItem(getStorageKey(user));
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
+    const raw = localStorage.getItem(GLOBAL_APPOINTMENTS_KEY);
+    if (!raw) {
+      localStorage.setItem(GLOBAL_APPOINTMENTS_KEY, JSON.stringify(INITIAL_MOCK_APPOINTMENTS));
+      return INITIAL_MOCK_APPOINTMENTS;
+    }
+    return JSON.parse(raw);
   } catch {
-    return [];
+    return INITIAL_MOCK_APPOINTMENTS;
   }
 }
 
-function writeAppointments(user, appointments) {
-  localStorage.setItem(getStorageKey(user), JSON.stringify(appointments));
+function writeGlobalAppointments(appointments) {
+  localStorage.setItem(GLOBAL_APPOINTMENTS_KEY, JSON.stringify(appointments));
 }
 
 export function getAppointments(user) {
-  return readAppointments(user);
+  const globalAppts = getAllAppointmentsGlobal();
+  if (!user) return [];
+
+  // Si es doctor, devuelve sus citas asignadas o todas si coincide el nombre
+  if (user.role === "doctor") {
+    return globalAppts.filter(
+      (a) =>
+        a.medico?.toLowerCase().includes(user.name.toLowerCase()) ||
+        a.medico === "Por asignar" ||
+        !a.medico
+    );
+  }
+
+  // Para paciente, filtra por email o consulta local
+  return globalAppts.filter(
+    (a) => a.pacienteEmail?.toLowerCase() === user.email?.toLowerCase()
+  );
 }
 
 export function createAppointment(user, appointmentData) {
-  const appointment = {
+  const newAppointment = {
     id: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+    pacienteNombre: user?.name || "Paciente",
+    pacienteEmail: user?.email || "",
     especialidad: appointmentData.especialidad,
-    medico: appointmentData.medico,
+    medico: appointmentData.medico || "Por asignar",
     fecha: appointmentData.fecha,
     hora: appointmentData.hora,
     motivo: appointmentData.motivo?.trim() || "",
     estado: "Pendiente",
   };
 
-  const appointments = readAppointments(user);
-  writeAppointments(user, [...appointments, appointment]);
-  return appointment;
+  const all = getAllAppointmentsGlobal();
+  const updated = [newAppointment, ...all];
+  writeGlobalAppointments(updated);
+  return newAppointment;
+}
+
+export function updateAppointmentStatus(appointmentId, newStatus) {
+  const all = getAllAppointmentsGlobal();
+  const updated = all.map((apt) =>
+    apt.id === appointmentId ? { ...apt, estado: newStatus } : apt
+  );
+  writeGlobalAppointments(updated);
+  return updated;
 }
 
 export function cancelAppointment(user, appointmentId) {
-  const appointments = readAppointments(user);
-  const updated = appointments.map((appointment) =>
-    appointment.id === appointmentId
-      ? { ...appointment, estado: "Cancelada" }
-      : appointment,
-  );
-
-  writeAppointments(user, updated);
-  return updated.find((appointment) => appointment.id === appointmentId) || null;
+  return updateAppointmentStatus(appointmentId, "Cancelada");
 }
 
 export function deleteCancelledAppointment(user, appointmentId) {
-  const appointments = readAppointments(user);
-  const target = appointments.find((appointment) => appointment.id === appointmentId);
+  const appointments = getAllAppointmentsGlobal();
+  const target = appointments.find((a) => a.id === appointmentId);
 
-  // A defensive check prevents the delete action from removing an active appointment.
   if (!target || target.estado !== "Cancelada") {
     return false;
   }
 
-  const updated = appointments.filter((appointment) => appointment.id !== appointmentId);
-  writeAppointments(user, updated);
+  const updated = appointments.filter((a) => a.id !== appointmentId);
+  writeGlobalAppointments(updated);
   return true;
 }

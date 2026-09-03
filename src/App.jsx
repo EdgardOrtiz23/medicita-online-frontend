@@ -5,16 +5,22 @@ import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
 import AppointmentsPage from "./pages/AppointmentsPage";
 import ProfilePage from "./pages/ProfilePage";
+import AdminPage from "./pages/AdminPage";
+import DoctorDashboardPage from "./pages/DoctorDashboardPage";
 
 export default function App() {
   const [lang, setLang] = useState("es");
   const [user, setUser] = useState(null);
-  // Se establece 'login' como la página inicial predeterminada
   const [currentPage, setCurrentPage] = useState("login");
 
   const handleLoginSuccess = (userData) => {
     setUser(userData);
-    setCurrentPage("home");
+    // Redirección especial si ingresa como Admin
+    if (userData.role === "admin" || userData.email === "Admin") {
+      setCurrentPage("admin");
+    } else {
+      setCurrentPage("home");
+    }
   };
 
   const handleRegisterSuccess = (userData) => {
@@ -36,15 +42,29 @@ export default function App() {
         color: "#0f172a",
       }}
     >
-      <Navbar
-        lang={lang}
-        setLang={setLang}
-        user={user}
-        onLogout={handleLogout}
-        currentPage={currentPage}
-        setCurrentPage={setCurrentPage}
-        onGoToProfile={() => setCurrentPage("profile")}
-      />
+      {currentPage !== "admin" && (
+        <Navbar
+          lang={lang}
+          setLang={setLang}
+          user={user}
+          onLogout={handleLogout}
+          currentPage={currentPage}
+          setCurrentPage={setCurrentPage}
+          onGoToProfile={() => setCurrentPage("profile")}
+        />
+      )}
+
+      {currentPage === "admin" && (
+        <AdminPage lang={lang} onLogout={handleLogout} />
+      )}
+
+      {currentPage === "doctor-dashboard" && user && (
+        <DoctorDashboardPage
+          lang={lang}
+          user={user}
+          onBack={() => setCurrentPage("home")}
+        />
+      )}
 
       {currentPage === "home" && (
         <HomePage
