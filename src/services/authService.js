@@ -1,130 +1,156 @@
 const API_URL = import.meta.env.VITE_API_URL;
+const TOKEN_KEY = "medicita_token";
+const USER_KEY = "medicita_user";
 
-const USERS_STORAGE_KEY = "medicita_users_list";
+export function getToken() {
+  return localStorage.getItem(TOKEN_KEY);
+}
 
-// Usuarios de prueba predeterminados para la gestión del Admin
-const INITIAL_MOCK_USERS = [
-  { id: "usr_1", name: "Carlos Mendoza", email: "carlos@gmail.com", password: "123", role: "paciente", phone: "8888-1111" },
-  { id: "usr_2", name: "Dra. Sofía Martínez", email: "sofia.med@gmail.com", password: "123", role: "doctor", phone: "8888-2222" },
-  { id: "usr_3", name: "Lucía Fernández", email: "lucia@gmail.com", password: "123", role: "paciente", phone: "8888-3333" },
-  { id: "usr_4", name: "Dr. Roberto Gómez", email: "roberto.med@gmail.com", password: "123", role: "doctor", phone: "8888-4444" },
-];
-
-export const ADMIN_USER = {
-  name: "Administrador",
-  email: "Admin",
-  role: "admin",
-};
-
-export function getAllUsers() {
+export function getStoredUser() {
   try {
-    const raw = localStorage.getItem(USERS_STORAGE_KEY);
-    if (!raw) {
-      localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(INITIAL_MOCK_USERS));
-      return INITIAL_MOCK_USERS;
-    }
-    return JSON.parse(raw);
+    const raw = localStorage.getItem(USER_KEY);
+    return raw ? JSON.parse(raw) : null;
   } catch {
-    return INITIAL_MOCK_USERS;
+    return null;
   }
 }
 
-export function updateUserRole(userId, newRole) {
-  const users = getAllUsers();
-  const updated = users.map((user) =>
-    user.id === userId ? { ...user, role: newRole } : user
-  );
-  localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(updated));
-  return updated;
+export function saveSession(user, token) {
+  if (token) {
+    localStorage.setItem(TOKEN_KEY, token);
+  }
+
+  if (user) {
+    localStorage.setItem(USER_KEY, JSON.stringify(user));
+  }
+}
+
+export function clearSession() {
+  localStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem(USER_KEY);
+}
+
+function authHeaders() {
+  const token = getToken();
+
+  return {
+    "Content-Type": "application/json",
+    Accept: "application/json",
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+}
+
+async function parseError(response, fallbackMessage) {
+  try {
+    const data = await response.json();
+    return data.message || fallbackMessage;
+  } catch {
+    return fallbackMessage;
+  }
+}
+
+async function apiFetch(path, options = {}) {
+  const response = await fetch(`${API_URL}${path}`, {
+    ...options,
+    headers: {
+      ...authHeaders(),
+      ...(options.headers || {}),
+    },
+  });
+
+  const isPublicAuth = path === "/login" || path === "/register";
+  if (response.status === 401 && !isPublicAuth) {
+    clearSession();
+    window.dispatchEvent(new Event("medicita:unauthorized"));
+    throw new Error(await parseError(response, "Sesión expirada"));
+  }
+
+  return response;
 }
 
 export async function loginUser(credentials) {
-  const trimmedEmail = credentials.email?.trim();
-  const trimmedPassword = credentials.password?.trim();
+  const response = await apiFetch("/login", {
+    method: "POST",
+    body: JSON.stringify({
+      email: credentials.email?.trim(),
+      password: credentials.password,
+    }),
+  });
 
-  // 1. Verificación de Administrador
-  if (trimmedEmail === "Admin" && trimmedPassword === "admin") {
-    return {
-      success: true,
-      user: ADMIN_USER,
-    };
+  if (!response.ok) {
+    throw new Error(await parseError(response, "Credenciales incorrectas"));
   }
 
-  // 2. Intentar backend API si existe
-  try {
-    const response = await fetch(`${API_URL}/login`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-      },
-      body: JSON.stringify(credentials),
-    });
-
-    if (response.ok) {
-      const data = await response.json();
-      return data;
-    }
-  } catch (error) {
-    console.warn("Backend no disponible, verificando usuarios de prueba...");
-  }
-
-  // 3. Fallback en memoria / localStorage validando email y contraseña
-  const users = getAllUsers();
-  const foundUser = users.find(
-    (u) =>
-      u.email.toLowerCase() === trimmedEmail.toLowerCase() &&
-      u.password === trimmedPassword
-  );
-
-  if (foundUser) {
-    return {
-      success: true,
-      user: {
-        name: foundUser.name,
-        email: foundUser.email,
-        role: foundUser.role || "paciente",
-      },
-    };
-  }
-
-  // Si no coincide correo ni contraseña, deniega el acceso
-  throw new Error("Credenciales incorrectas");
+  const data = await response.json();
+  saveSession(data.user, data.token);
+  return data;
 }
 
 export async function registerUser(userData) {
-  try {
-    const response = await fetch(`${API_URL}/register`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-      },
-      body: JSON.stringify(userData),
-    });
+  const response = await apiFetch("/register", {
+    method: "POST",
+    body: JSON.stringify({
+      name: userData.name,
+      email: userData.email,
+      password: userData.password,
+      password_confirmation: userData.confirmPassword || userData.password,
+    }),
+  });
 
-    if (response.ok) {
-      return await response.json();
-    }
-  } catch (error) {
-    console.warn("Backend no disponible, registrando de forma simulada...");
+  if (!response.ok) {
+    throw new Error(await parseError(response, "Error al registrar usuario"));
   }
 
-  // Registrar en localStorage localmente con rol 'paciente' por defecto
-  const users = getAllUsers();
-  const newUser = {
-    id: `usr_${Date.now()}`,
-    name: userData.name || "Nuevo Usuario",
-    email: userData.email,
-    password: userData.password,
-    role: "paciente",
-    phone: userData.phone || "Sin teléfono",
-  };
+  const data = await response.json();
+  saveSession(data.user, data.token);
+  return data;
+}
 
-  localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify([...users, newUser]));
+export async function fetchCurrentUser() {
+  const response = await apiFetch("/user");
 
-  return {
-    success: true,
-    user: { name: newUser.name, email: newUser.email, role: newUser.role },
-  };
+  if (!response.ok) {
+    throw new Error(await parseError(response, "No se pudo recuperar la sesión"));
+  }
+
+  const data = await response.json();
+  const user = data.user || data;
+  saveSession(user);
+  return user;
+}
+
+export async function logoutUser() {
+  try {
+    if (getToken()) {
+      await apiFetch("/logout", { method: "POST" });
+    }
+  } catch {
+    // Si el backend no responde, igual se limpia la sesión local.
+  } finally {
+    clearSession();
+  }
+}
+
+export async function getAllUsers() {
+  const response = await apiFetch("/users");
+
+  if (!response.ok) {
+    throw new Error(await parseError(response, "No se pudieron cargar los usuarios"));
+  }
+
+  const data = await response.json();
+  return data.users || [];
+}
+
+export async function updateUserRole(userId, newRole) {
+  const response = await apiFetch(`/users/${userId}/role`, {
+    method: "PATCH",
+    body: JSON.stringify({ role: newRole }),
+  });
+
+  if (!response.ok) {
+    throw new Error(await parseError(response, "No se pudo actualizar el rol"));
+  }
+
+  return response.json();
 }

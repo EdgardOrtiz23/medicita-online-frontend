@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { registerUser } from "../services/authService";
+import { useAuth } from "../context/AuthContext";
 
 export default function RegisterPage({ lang, onRegisterSuccess, onGoToLogin }) {
+  const { register } = useAuth();
   const [form, setForm] = useState({
     name: "",
     email: "",
@@ -49,7 +50,7 @@ export default function RegisterPage({ lang, onRegisterSuccess, onGoToLogin }) {
 
     setLoading(true);
     try {
-      const data = await registerUser(form);
+      const data = await register(form);
       onRegisterSuccess(data.user);
     } catch (err) {
       setError(

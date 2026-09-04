@@ -5,8 +5,10 @@ import {
   createAppointment,
   getAppointments,
 } from "../services/appointmentService";
+import { useAuth } from "../context/AuthContext";
 
 export default function HomePage({ lang, user, onGoToAppointments, onGoToProfile }) {
+  const { can } = useAuth();
   const t = {
     es: {
       eyebrow: "Tu salud, más simple",
@@ -115,12 +117,16 @@ export default function HomePage({ lang, user, onGoToAppointments, onGoToProfile
             <p className="hero-description">{copy.intro}</p>
 
             <div className="hero-actions">
-              <button type="button" className="primary-action" onClick={() => openPanel("form")}>
-                <span>{copy.primary}</span><span className="action-arrow">→</span>
-              </button>
-              <button type="button" className="secondary-action" onClick={openAppointments}>
-                {copy.secondary}
-              </button>
+              {can("citas.crear") && (
+                <button type="button" className="primary-action" onClick={() => openPanel("form")}>
+                  <span>{copy.primary}</span><span className="action-arrow">→</span>
+                </button>
+              )}
+              {can("citas.listar") && (
+                <button type="button" className="secondary-action" onClick={openAppointments}>
+                  {copy.secondary}
+                </button>
+              )}
             </div>
 
             <div className="trust-row">
@@ -155,9 +161,11 @@ export default function HomePage({ lang, user, onGoToAppointments, onGoToProfile
                 <span className="card-label">{copy.statusTitle}</span>
                 <h3>{copy.appointmentTitle}</h3>
                 <p>{copy.appointmentText}</p>
-                <button type="button" className="text-action" onClick={() => openPanel("form")}>
-                  {copy.appointmentAction} <span>→</span>
-                </button>
+                {can("citas.crear") && (
+                  <button type="button" className="text-action" onClick={() => openPanel("form")}>
+                    {copy.appointmentAction} <span>→</span>
+                  </button>
+                )}
               </div>
               <div className="appointment-orb" />
             </article>
@@ -178,22 +186,28 @@ export default function HomePage({ lang, user, onGoToAppointments, onGoToProfile
         <section className="quick-section">
           <div className="quick-heading"><span className="section-kicker">ACCIONES</span><h2>{copy.quickTitle}</h2></div>
           <div className="quick-grid">
-            <button type="button" className="quick-card quick-card-button" onClick={() => openPanel("form")}>
-              <div className="quick-icon blue-icon">＋</div><div><h3>{copy.quick1Title}</h3><p>{copy.quick1Text}</p></div><span className="quick-arrow">↗</span>
-            </button>
-            <button type="button" className="quick-card quick-card-button" onClick={openAppointments}>
-              <div className="quick-icon violet-icon">▣</div><div><h3>{copy.quick2Title}</h3><p>{copy.quick2Text}</p></div><span className="quick-arrow">↗</span>
-            </button>
-            <button type="button" className="quick-card quick-card-button" onClick={onGoToProfile}>
-              <div className="quick-icon green-icon">●</div><div><h3>{copy.quick3Title}</h3><p>{copy.quick3Text}</p></div><span className="quick-arrow">↗</span>
-            </button>
+            {can("citas.crear") && (
+              <button type="button" className="quick-card quick-card-button" onClick={() => openPanel("form")}>
+                <div className="quick-icon blue-icon">＋</div><div><h3>{copy.quick1Title}</h3><p>{copy.quick1Text}</p></div><span className="quick-arrow">↗</span>
+              </button>
+            )}
+            {can("citas.listar") && (
+              <button type="button" className="quick-card quick-card-button" onClick={openAppointments}>
+                <div className="quick-icon violet-icon">▣</div><div><h3>{copy.quick2Title}</h3><p>{copy.quick2Text}</p></div><span className="quick-arrow">↗</span>
+              </button>
+            )}
+            {can("perfil.ver") && (
+              <button type="button" className="quick-card quick-card-button" onClick={onGoToProfile}>
+                <div className="quick-icon green-icon">●</div><div><h3>{copy.quick3Title}</h3><p>{copy.quick3Text}</p></div><span className="quick-arrow">↗</span>
+              </button>
+            )}
           </div>
         </section>
 
         <footer className="home-footer"><span className="footer-mark">✚</span><span>{copy.footer}</span></footer>
       </section>
 
-      {activePanel === "form" && (
+      {activePanel === "form" && can("citas.crear") && (
         <AppointmentForm
           lang={lang}
           onSave={handleSave}

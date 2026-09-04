@@ -1,12 +1,15 @@
+import { useAuth } from "../context/AuthContext";
+
 export default function Navbar({
   lang,
   setLang,
-  user,
-  onLogout,
   currentPage,
   setCurrentPage,
   onGoToProfile,
+  onLogout,
 }) {
+  const { user, can } = useAuth();
+
   return (
     <nav
       style={{
@@ -25,13 +28,15 @@ export default function Navbar({
           color: "#2563eb",
           cursor: "pointer",
         }}
-        onClick={() => (user?.role === "admin" ? setCurrentPage("admin") : setCurrentPage("home"))}
+        onClick={() =>
+          can("admin.acceder") ? setCurrentPage("admin") : setCurrentPage("home")
+        }
       >
         MediCita Online
       </div>
 
       <div style={{ display: "flex", gap: "16px", alignItems: "center" }}>
-        {user && user.role !== "admin" && (
+        {user && !can("admin.acceder") && (
           <>
             <button
               type="button"
@@ -47,7 +52,7 @@ export default function Navbar({
               {lang === "en" ? "Home" : "Inicio"}
             </button>
 
-            {user.role === "doctor" && (
+            {can("doctor.panel") && (
               <button
                 type="button"
                 onClick={() => setCurrentPage("doctor-dashboard")}
@@ -65,34 +70,56 @@ export default function Navbar({
               </button>
             )}
 
-            <button
-              type="button"
-              onClick={() => setCurrentPage("appointments")}
-              style={{
-                background: "none",
-                border: "none",
-                color: "#1e293b",
-                fontWeight: currentPage === "appointments" ? "bold" : "normal",
-                cursor: "pointer",
-              }}
-            >
-              {lang === "en" ? "Appointments" : "Mis Citas"}
-            </button>
+            {can("citas.listar") && (
+              <button
+                type="button"
+                onClick={() => setCurrentPage("appointments")}
+                style={{
+                  background: "none",
+                  border: "none",
+                  color: "#1e293b",
+                  fontWeight: currentPage === "appointments" ? "bold" : "normal",
+                  cursor: "pointer",
+                }}
+              >
+                {lang === "en" ? "Appointments" : "Mis Citas"}
+              </button>
+            )}
 
-            <button
-              type="button"
-              onClick={onGoToProfile}
-              style={{
-                background: "none",
-                border: "none",
-                color: "#1e293b",
-                fontWeight: currentPage === "profile" ? "bold" : "normal",
-                cursor: "pointer",
-              }}
-            >
-              {lang === "en" ? "Profile" : "Perfil"}
-            </button>
+            {can("perfil.ver") && (
+              <button
+                type="button"
+                onClick={onGoToProfile}
+                style={{
+                  background: "none",
+                  border: "none",
+                  color: "#1e293b",
+                  fontWeight: currentPage === "profile" ? "bold" : "normal",
+                  cursor: "pointer",
+                }}
+              >
+                {lang === "en" ? "Profile" : "Perfil"}
+              </button>
+            )}
           </>
+        )}
+
+        {can("admin.acceder") && (
+          <button
+            type="button"
+            onClick={() => setCurrentPage("admin")}
+            style={{
+              background: "#fef3c7",
+              color: "#92400e",
+              border: "none",
+              padding: "6px 12px",
+              borderRadius: "6px",
+              fontWeight: "bold",
+              cursor: "pointer",
+            }}
+          >
+            Admin
+          </button>
         )}
 
         <button

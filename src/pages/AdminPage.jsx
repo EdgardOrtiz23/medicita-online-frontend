@@ -1,14 +1,46 @@
 import { useEffect, useState } from "react";
 import { getAllUsers, updateUserRole } from "../services/authService";
+import { useAuth } from "../context/AuthContext";
 import "./AdminPage.css";
 
 export default function AdminPage({ lang, onLogout }) {
+  const { can } = useAuth();
   const [users, setUsers] = useState([]);
   const [notice, setNotice] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    setUsers(getAllUsers());
-  }, []);
+    let cancelled = false;
+
+    async function loadUsers() {
+      setLoading(true);
+      setError("");
+      try {
+        const list = await getAllUsers();
+        if (!cancelled) {
+          setUsers(list);
+        }
+      } catch {
+        if (!cancelled) {
+          setError(
+            lang === "en"
+              ? "Could not load users from the server."
+              : "No se pudieron cargar los usuarios desde el servidor.",
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    }
+
+    loadUsers();
+    return () => {
+      cancelled = true;
+    };
+  }, [lang]);
 
   useEffect(() => {
     if (!notice) return undefined;
@@ -16,14 +48,30 @@ export default function AdminPage({ lang, onLogout }) {
     return () => window.clearTimeout(timer);
   }, [notice]);
 
-  const handleRoleChange = (userId, newRole) => {
-    const updated = updateUserRole(userId, newRole);
-    setUsers(updated);
-    setNotice(
-      lang === "en"
-        ? "User role updated successfully."
-        : "Rol de usuario actualizado correctamente.",
+  const handleRoleChange = async (userId, newRole) => {
+    const previousUsers = users;
+    setUsers((current) =>
+      current.map((user) =>
+        user.id === userId ? { ...user, role: newRole } : user,
+      ),
     );
+    setError("");
+
+    try {
+      await updateUserRole(userId, newRole);
+      setNotice(
+        lang === "en"
+          ? "User role updated successfully."
+          : "Rol de usuario actualizado correctamente.",
+      );
+    } catch {
+      setUsers(previousUsers);
+      setError(
+        lang === "en"
+          ? "Could not update the user role."
+          : "No se pudo actualizar el rol del usuario.",
+      );
+    }
   };
 
   const copy =
@@ -60,6 +108,11 @@ export default function AdminPage({ lang, onLogout }) {
           {notice}
         </div>
       )}
+      {error && !loading && users.length > 0 && (
+        <div className="admin-toast" role="alert">
+          {error}
+        </div>
+      )}
 
       <div className="admin-shell">
         <header className="admin-header">
@@ -84,6 +137,23 @@ export default function AdminPage({ lang, onLogout }) {
               </tr>
             </thead>
             <tbody>
+              {loading && (
+                <tr>
+                  <td colSpan={4}>
+                    {lang === "en" ? "Loading users..." : "Cargando usuarios..."}
+                  </td>
+                </tr>
+              )}
+              {!loading && users.length === 0 && (
+                <tr>
+                  <td colSpan={4}>
+                    {error ||
+                      (lang === "en"
+                        ? "There are no registered users."
+                        : "No hay usuarios registrados.")}
+                  </td>
+                </tr>
+              )}
               {users.map((u) => (
                 <tr key={u.id}>
                   <td>
@@ -92,14 +162,18 @@ export default function AdminPage({ lang, onLogout }) {
                   <td>{u.email}</td>
                   <td>{u.phone || "—"}</td>
                   <td>
-                    <select
-                      className={`role-select ${u.role}`}
-                      value={u.role || "paciente"}
-                      onChange={(e) => handleRoleChange(u.id, e.target.value)}
-                    >
-                      <option value="paciente">{copy.rolePatient}</option>
-                      <option value="doctor">{copy.roleDoctor}</option>
-                    </select>
+                    {can("usuarios.cambiar_rol") ? (
+                      <select
+                        className={`role-select ${u.role}`}
+                        value={u.role || "paciente"}
+                        onChange={(e) => handleRoleChange(u.id, e.target.value)}
+                      >
+                        <option value="paciente">{copy.rolePatient}</option>
+                        <option value="doctor">{copy.roleDoctor}</option>
+                      </select>
+                    ) : (
+                      u.role || "paciente"
+                    )}
                   </td>
                 </tr>
               ))}

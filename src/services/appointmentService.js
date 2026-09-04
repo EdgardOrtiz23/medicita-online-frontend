@@ -66,7 +66,10 @@ export function getAppointments(user) {
   if (!user) return [];
 
   // Si es doctor, devuelve sus citas asignadas o todas si coincide el nombre
-  if (user.role === "doctor") {
+  const isDoctor =
+    user.role === "doctor" || user.permissions?.includes("doctor.panel");
+
+  if (isDoctor) {
     return globalAppts.filter(
       (a) =>
         a.medico?.toLowerCase().includes(user.name.toLowerCase()) ||

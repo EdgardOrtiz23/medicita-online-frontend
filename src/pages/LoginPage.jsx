@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { loginUser } from "../services/authService";
+import { useAuth } from "../context/AuthContext";
 
 export default function LoginPage({ lang, onLoginSuccess, onGoToRegister }) {
+  const { login } = useAuth();
   const [form, setForm] = useState({ email: "", password: "" });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -33,7 +34,7 @@ export default function LoginPage({ lang, onLoginSuccess, onGoToRegister }) {
     setLoading(true);
 
     try {
-      const data = await loginUser(form);
+      const data = await login(form);
       onLoginSuccess(data.user);
     } catch (err) {
       setError(
