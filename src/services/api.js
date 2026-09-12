@@ -11,13 +11,21 @@ export class ApiError extends Error {
 }
 
 async function request(path, options = {}) {
+  const token = localStorage.getItem("medicita_token");
+  
+  const headers = {
+    Accept: "application/json",
+    "Content-Type": "application/json",
+    ...(options.headers || {}),
+  };
+
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+
   const response = await fetch(`${API_URL}${path}`, {
     ...options,
-    headers: {
-      Accept: "application/json",
-      "Content-Type": "application/json",
-      ...(options.headers || {}),
-    },
+    headers,
   });
 
   let data = null;

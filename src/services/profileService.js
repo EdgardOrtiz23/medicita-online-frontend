@@ -1,56 +1,52 @@
-const STORAGE_PREFIX = "medicita_profile_";
-
-function getStorageKey(user) {
-  const identity = user?.email || user?.name || "guest";
-  const normalized = String(identity).trim().toLowerCase().replace(/[^a-z0-9@._-]/g, "_");
-  return `${STORAGE_PREFIX}${normalized || "guest"}`;
-}
+import { api } from "./api";
 
 const getDefaultProfile = (user = {}) => ({
   nombreCompleto: user?.name || "",
   correoElectronico: user?.email || "",
-  fechaNacimiento: "",
-  sexo: "",
-  telefono: "",
-  peso: "",
-  altura: "",
-  direccion: "",
-  ciudad: "",
-  contactoEmergencia: "",
-  telefonoEmergencia: "",
+  fechaNacimiento: user?.fecha_nacimiento || "",
+  sexo: user?.sexo || "",
+  telefono: user?.telefono || "",
+  peso: user?.peso || "",
+  altura: user?.altura || "",
+  direccion: user?.direccion || "",
+  ciudad: user?.ciudad || "",
+  contactoEmergencia: user?.contacto_emergencia || "",
+  telefonoEmergencia: user?.telefono_emergencia || "",
 });
 
-export function getProfile(user) {
-  const defaults = getDefaultProfile(user);
-
+export async function getProfile(user) {
   try {
-    const raw = localStorage.getItem(getStorageKey(user));
-    if (!raw) return defaults;
-
-    const parsed = JSON.parse(raw);
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-      return defaults;
-    }
-
-    return { ...defaults, ...parsed };
-  } catch {
-    return defaults;
+    const response = await api.get("/profile");
+    const userData = response.user || response;
+    return getDefaultProfile(userData);
+  } catch (error) {
+    console.error("Error obteniendo perfil desde el backend:", error);
+    return getDefaultProfile(user);
   }
 }
 
-export function saveProfile(user, profile) {
-  const nextProfile = {
-    ...getDefaultProfile(user),
-    ...profile,
+export async function updateProfile(user, changes) {
+  const payload = {
+    name: changes.nombreCompleto,
+    email: changes.correoElectronico,
+    fecha_nacimiento: changes.fechaNacimiento,
+    sexo: changes.sexo,
+    telefono: changes.telefono,
+    peso: changes.peso,
+    altura: changes.altura,
+    direccion: changes.direccion,
+    ciudad: changes.ciudad,
+    contacto_emergencia: changes.contactoEmergencia,
+    telefono_emergencia: changes.telefonoEmergencia,
   };
 
-  localStorage.setItem(getStorageKey(user), JSON.stringify(nextProfile));
-  return nextProfile;
+  try {
+    const response = await api.patch("/profile", payload);
+    return getDefaultProfile(response.user);
+  } catch (error) {
+    console.error("Error actualizando perfil en el backend:", error);
+    throw error;
+  }
 }
 
-export function updateProfile(user, changes) {
-  return saveProfile(user, {
-    ...getProfile(user),
-    ...changes,
-  });
-}
+export const saveProfile = updateProfile;
