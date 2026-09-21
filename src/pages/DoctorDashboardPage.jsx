@@ -4,6 +4,8 @@ import "./DoctorDashboardPage.css";
 
 export default function DoctorDashboardPage({ currentUser, setCurrentPage }) {
   const [myAppointments, setMyAppointments] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
   const [toastMessage, setToastMessage] = useState("");
 
   useEffect(() => {
@@ -11,15 +13,23 @@ export default function DoctorDashboardPage({ currentUser, setCurrentPage }) {
   }, [currentUser]);
 
   const loadDoctorAppointments = () => {
-    // getAppointments(currentUser) filtra automáticamente las citas del doctor en sesión
-    const appointments = getAppointments(currentUser);
-    setMyAppointments(appointments);
+    setLoading(true);
+    setLoadError("");
+    try {
+      const appointments = getAppointments(currentUser);
+      setMyAppointments(appointments);
+    } catch (error) {
+      console.error(error);
+      setLoadError("No se pudieron cargar las citas.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleStatusChange = (id, newStatus) => {
     updateAppointmentStatus(id, newStatus);
     setMyAppointments((prev) =>
-      prev.map((app) => (app.id === id ? { ...app, status: newStatus } : app))
+      prev.map((app) => (app.id === id ? { ...app, estado: newStatus } : app))
     );
     setToastMessage(`Cita ${newStatus} correctamente`);
     setTimeout(() => setToastMessage(""), 3000);
@@ -39,7 +49,11 @@ export default function DoctorDashboardPage({ currentUser, setCurrentPage }) {
         <p>Revisa las citas asignadas de tus pacientes y decide si aceptarlas o rechazarlas.</p>
       </div>
 
-      {myAppointments.length === 0 ? (
+      {loading ? (
+        <div style={{ padding: "40px", textAlign: "center", color: "#64748b" }}>Cargando citas...</div>
+      ) : loadError ? (
+        <div role="alert" style={{ padding: "40px", textAlign: "center", color: "#dc2626" }}>{loadError}</div>
+      ) : myAppointments.length === 0 ? (
         <div style={{ padding: "40px", textAlign: "center", color: "#64748b" }}>
           No tienes citas asignadas actualmente.
         </div>
@@ -50,37 +64,37 @@ export default function DoctorDashboardPage({ currentUser, setCurrentPage }) {
               <div>
                 <div className="doctor-card-header">
                   <div>
-                    <h3>{app.patientName}</h3>
-                    <div className="doctor-card-email">{app.patientEmail}</div>
+                    <h3>{app.pacienteNombre}</h3>
+                    <div className="doctor-card-email">{app.pacienteEmail}</div>
                   </div>
-                  <span className={`status-badge ${app.status}`}>
-                    {app.status ? app.status.charAt(0).toUpperCase() + app.status.slice(1) : "Pendiente"}
+                  <span className={`status-badge ${app.estado}`}>
+                    {app.estado ? app.estado.charAt(0).toUpperCase() + app.estado.slice(1) : "Pendiente"}
                   </span>
                 </div>
 
                 <div className="doctor-card-body">
                   <p>
-                    <strong>Motivo de consulta:</strong> {app.reason}
+                    <strong>Motivo de consulta:</strong> {app.motivo}
                   </p>
                   <p>
-                    <strong>Especialidad:</strong> {app.specialty}
+                    <strong>Especialidad:</strong> {app.especialidad}
                   </p>
                   <p>
-                    <strong>Fecha y Hora:</strong> {app.date}
+                    <strong>Fecha y Hora:</strong> {app.fecha}
                   </p>
                 </div>
               </div>
 
-              {app.status === "pendiente" && (
+              {app.estado === "Pendiente" && (
                 <div className="doctor-actions">
                   <button
-                    onClick={() => handleStatusChange(app.id, "aceptada")}
+                    onClick={() => handleStatusChange(app.id, "Aceptada")}
                     className="btn-accept"
                   >
                     Aceptar
                   </button>
                   <button
-                    onClick={() => handleStatusChange(app.id, "rechazada")}
+                    onClick={() => handleStatusChange(app.id, "Rechazada")}
                     className="btn-reject"
                   >
                     Rechazar

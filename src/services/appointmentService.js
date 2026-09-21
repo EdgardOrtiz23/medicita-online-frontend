@@ -1,127 +1,66 @@
-const STORAGE_PREFIX = "medicita_appointments_";
-const GLOBAL_APPOINTMENTS_KEY = "medicita_global_appointments";
+import { api } from "./api";
 
-// Citas de prueba iniciales para doctores
-const INITIAL_MOCK_APPOINTMENTS = [
-  {
-    id: "apt_101",
-    pacienteNombre: "Carlos Mendoza",
-    pacienteEmail: "carlos@gmail.com",
-    especialidad: "Medicina General",
-    medico: "Dra. Sofía Martínez",
-    fecha: "2026-09-10",
-    hora: "09:00",
-    motivo: "Chequeo de rutina y presión arterial.",
-    estado: "Pendiente",
-  },
-  {
-    id: "apt_102",
-    pacienteNombre: "Lucía Fernández",
-    pacienteEmail: "lucia@gmail.com",
-    especialidad: "Cardiología",
-    medico: "Dr. Roberto Gómez",
-    fecha: "2026-09-12",
-    hora: "10:30",
-    motivo: "Evaluación por taquicardias ocasionales.",
-    estado: "Pendiente",
-  },
-  {
-    id: "apt_103",
-    pacienteNombre: "Carlos Mendoza",
-    pacienteEmail: "carlos@gmail.com",
-    especialidad: "Pediatría",
-    medico: "Dra. Sofía Martínez",
-    fecha: "2026-09-15",
-    hora: "14:00",
-    motivo: "Consulta de seguimiento.",
-    estado: "Aceptada",
-  },
-];
-
-function getStorageKey(user) {
-  const identity = user?.email || user?.name || "guest";
-  const normalized = String(identity).trim().toLowerCase().replace(/[^a-z0-9@._-]/g, "_");
-  return `${STORAGE_PREFIX}${normalized || "guest"}`;
-}
-
-export function getAllAppointmentsGlobal() {
+export async function getAppointments() {
   try {
-    const raw = localStorage.getItem(GLOBAL_APPOINTMENTS_KEY);
-    if (!raw) {
-      localStorage.setItem(GLOBAL_APPOINTMENTS_KEY, JSON.stringify(INITIAL_MOCK_APPOINTMENTS));
-      return INITIAL_MOCK_APPOINTMENTS;
-    }
-    return JSON.parse(raw);
-  } catch {
-    return INITIAL_MOCK_APPOINTMENTS;
+    const citas = await api.get("/citas");
+    return citas.map(cita => ({
+      id: cita.id,
+      pacienteNombre: cita.patient?.name || "Paciente",
+      pacienteEmail: cita.patient?.email || "",
+      medico_id: cita.doctor_id,
+      medico: cita.doctor?.name || "Por asignar",
+      fecha: cita.appointment_date,
+      hora: cita.appointment_time,
+      estado: mapStatusToFrontend(cita.status),
+      especialidad: "General", 
+      motivo: "Consulta médica"
+    }));
+  } catch (error) {
+    console.error("Error obteniendo citas:", error);
+    throw error;
   }
 }
 
-function writeGlobalAppointments(appointments) {
-  localStorage.setItem(GLOBAL_APPOINTMENTS_KEY, JSON.stringify(appointments));
-}
-
-export function getAppointments(user) {
-  const globalAppts = getAllAppointmentsGlobal();
-  if (!user) return [];
-
-  // Si es doctor, devuelve sus citas asignadas o todas si coincide el nombre
-  if (user.role === "doctor") {
-    return globalAppts.filter(
-      (a) =>
-        a.medico?.toLowerCase().includes(user.name.toLowerCase()) ||
-        a.medico === "Por asignar" ||
-        !a.medico
-    );
-  }
-
-  // Para paciente, filtra por email o consulta local
-  return globalAppts.filter(
-    (a) => a.pacienteEmail?.toLowerCase() === user.email?.toLowerCase()
-  );
-}
-
-export function createAppointment(user, appointmentData) {
-  const newAppointment = {
-    id: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
-    pacienteNombre: user?.name || "Paciente",
-    pacienteEmail: user?.email || "",
-    especialidad: appointmentData.especialidad,
-    medico: appointmentData.medico || "Por asignar",
-    fecha: appointmentData.fecha,
-    hora: appointmentData.hora,
-    motivo: appointmentData.motivo?.trim() || "",
-    estado: "Pendiente",
+export async function createAppointment(user, appointmentData) {
+  const payload = {
+    doctor_id: appointmentData.medico_id || appointmentData.medico, 
+    appointment_date: appointmentData.fecha,
+    appointment_time: appointmentData.hora,
+    status: "pendiente"
   };
 
-  const all = getAllAppointmentsGlobal();
-  const updated = [newAppointment, ...all];
-  writeGlobalAppointments(updated);
-  return newAppointment;
+  const cita = await api.post("/citas", payload);
+  return cita;
 }
 
-export function updateAppointmentStatus(appointmentId, newStatus) {
-  const all = getAllAppointmentsGlobal();
-  const updated = all.map((apt) =>
-    apt.id === appointmentId ? { ...apt, estado: newStatus } : apt
-  );
-  writeGlobalAppointments(updated);
-  return updated;
+export async function updateAppointmentStatus(appointmentId, newStatus) {
+  const payload = {
+    status: mapStatusToBackend(newStatus)
+  };
+  const cita = await api.patch(`/citas/${appointmentId}`, payload);
+  return cita;
 }
 
-export function cancelAppointment(user, appointmentId) {
-  return updateAppointmentStatus(appointmentId, "Cancelada");
+export async function cancelAppointment(user, appointmentId) {
+  return updateAppointmentStatus(appointmentId, "cancelada");
 }
 
-export function deleteCancelledAppointment(user, appointmentId) {
-  const appointments = getAllAppointmentsGlobal();
-  const target = appointments.find((a) => a.id === appointmentId);
-
-  if (!target || target.estado !== "Cancelada") {
-    return false;
-  }
-
-  const updated = appointments.filter((a) => a.id !== appointmentId);
-  writeGlobalAppointments(updated);
+export async function deleteCancelledAppointment(user, appointmentId) {
+  await api.delete(`/citas/${appointmentId}`);
   return true;
+}
+
+function mapStatusToFrontend(status) {
+  const s = status.toLowerCase();
+  if (s === 'pendiente') return 'Pendiente';
+  if (s === 'cancelada') return 'Cancelada';
+  if (s === 'aceptada' || s === 'confirmada') return 'Aceptada';
+  return 'Pendiente';
+}
+
+function mapStatusToBackend(status) {
+  const s = status.toLowerCase();
+  if (s.includes('cancel')) return 'cancelada';
+  if (s.includes('acept')) return 'aceptada';
+  return 'pendiente';
 }

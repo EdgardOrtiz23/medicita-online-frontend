@@ -4,10 +4,14 @@ import "./AdminPage.css";
 
 export default function AdminPage({ lang, onLogout }) {
   const [users, setUsers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
   const [notice, setNotice] = useState("");
 
   useEffect(() => {
-    setUsers(getAllUsers());
+    setLoading(true);
+    setLoadError("");
+    try { setUsers(getAllUsers()); } catch (error) { console.error(error); setLoadError("No se pudieron cargar los usuarios."); } finally { setLoading(false); }
   }, []);
 
   useEffect(() => {
@@ -62,6 +66,9 @@ export default function AdminPage({ lang, onLogout }) {
       )}
 
       <div className="admin-shell">
+        {loading && <div role="status">Cargando usuarios...</div>}
+        {loadError && <div role="alert">{loadError}</div>}
+        {!loading && !loadError && users.length === 0 && <div role="status">No existen usuarios registrados.</div>}
         <header className="admin-header">
           <div>
             <span className="section-kicker">MEDICITA ONLINE - ADMIN</span>

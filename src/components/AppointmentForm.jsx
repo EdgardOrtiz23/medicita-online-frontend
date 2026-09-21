@@ -13,7 +13,7 @@ const doctorsBySpecialty = {
 export const SPECIALTIES = Object.keys(doctorsBySpecialty);
 export const getDoctors = (specialty) => doctorsBySpecialty[specialty] || [];
 
-export default function AppointmentForm({ lang, onSave, onClose }) {
+export default function AppointmentForm({ lang, onSave, onClose, saving = false }) {
   const copy = lang === "en"
     ? {
         title: "Book an appointment",
@@ -26,6 +26,7 @@ export default function AppointmentForm({ lang, onSave, onClose }) {
         reasonPlaceholder: "Optional: tell us briefly why you need the appointment",
         select: "Select an option",
         save: "Book appointment",
+        saving: "Booking...",
         close: "Cancel",
         required: "Please complete all required fields.",
       }
@@ -40,6 +41,7 @@ export default function AppointmentForm({ lang, onSave, onClose }) {
         reasonPlaceholder: "Opcional: escribe brevemente el motivo de tu consulta",
         select: "Selecciona una opción",
         save: "Solicitar cita",
+        saving: "Guardando...",
         close: "Cancelar",
         required: "Completa todos los campos obligatorios.",
       };
@@ -135,7 +137,7 @@ export default function AppointmentForm({ lang, onSave, onClose }) {
 
           <div className="modal-actions">
             <button type="button" className="modal-secondary" onClick={onClose}>{copy.close}</button>
-            <button type="submit" className="modal-primary">{copy.save}<span>→</span></button>
+            <button type="submit" className="modal-primary" disabled={saving}>{saving ? copy.saving : copy.save}<span>→</span></button>
           </div>
         </form>
       </div>

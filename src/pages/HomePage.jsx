@@ -70,6 +70,7 @@ export default function HomePage({ lang, user, onGoToAppointments, onGoToProfile
   const [appointments, setAppointments] = useState([]);
   const [activePanel, setActivePanel] = useState(null);
   const [notice, setNotice] = useState("");
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     setAppointments(getAppointments(user));
@@ -96,11 +97,16 @@ export default function HomePage({ lang, user, onGoToAppointments, onGoToProfile
     onGoToAppointments();
   };
 
-  const handleSave = (data) => {
-    const appointment = createAppointment(user, data);
-    setAppointments((current) => [...current, appointment]);
-    setActivePanel(null);
-    setNotice(copy.success);
+  const handleSave = async (data) => {
+    setSaving(true);
+    try {
+      const appointment = createAppointment(user, data);
+      setAppointments((current) => [appointment, ...current]);
+      setActivePanel(null);
+      setNotice(copy.success);
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -197,6 +203,7 @@ export default function HomePage({ lang, user, onGoToAppointments, onGoToProfile
         <AppointmentForm
           lang={lang}
           onSave={handleSave}
+          saving={saving}
           onClose={() => setActivePanel(null)}
         />
       )}

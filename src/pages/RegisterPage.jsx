@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { registerUser } from "../services/authService";
+import { ApiError } from "../services/api";
 
 export default function RegisterPage({ lang, onRegisterSuccess, onGoToLogin }) {
   const [form, setForm] = useState({
@@ -9,6 +10,7 @@ export default function RegisterPage({ lang, onRegisterSuccess, onGoToLogin }) {
     confirmPassword: "",
   });
   const [error, setError] = useState("");
+  const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
 
   const t = {
@@ -41,6 +43,7 @@ export default function RegisterPage({ lang, onRegisterSuccess, onGoToLogin }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
+    setErrors({});
 
     if (form.password !== form.confirmPassword) {
       setError(t[lang].passMismatch);
@@ -52,9 +55,12 @@ export default function RegisterPage({ lang, onRegisterSuccess, onGoToLogin }) {
       const data = await registerUser(form);
       onRegisterSuccess(data.user);
     } catch (err) {
-      setError(
-        lang === "es" ? "Error al registrar usuario" : "Registration failed",
-      );
+      if (err instanceof ApiError && err.status === 422) {
+        setErrors(err.errors || {});
+        setError(Object.values(err.errors || {}).flat().join(" ") || err.message);
+      } else {
+        setError(lang === "es" ? "Error al registrar usuario" : "Registration failed");
+      }
     } finally {
       setLoading(false);
     }
@@ -73,42 +79,49 @@ export default function RegisterPage({ lang, onRegisterSuccess, onGoToLogin }) {
             <label style={styles.label}>{t[lang].name}</label>
             <input
               type="text"
+              name="name"
               required
               placeholder="Juan Pérez"
               value={form.name}
               onChange={(e) => setForm({ ...form, name: e.target.value })}
               style={styles.input}
             />
+            {errors.name?.map((message) => <span key={message} style={styles.fieldError}>{message}</span>)}
           </div>
 
           <div style={styles.field}>
             <label style={styles.label}>{t[lang].email}</label>
             <input
               type="text"
+              name="email"
               required
               placeholder="juan@ejemplo.com"
               value={form.email}
               onChange={(e) => setForm({ ...form, email: e.target.value })}
               style={styles.input}
             />
+            {errors.email?.map((message) => <span key={message} style={styles.fieldError}>{message}</span>)}
           </div>
 
           <div style={styles.field}>
             <label style={styles.label}>{t[lang].password}</label>
             <input
               type="password"
+              name="password"
               required
               placeholder="••••••••"
               value={form.password}
               onChange={(e) => setForm({ ...form, password: e.target.value })}
               style={styles.input}
             />
+            {errors.password?.map((message) => <span key={message} style={styles.fieldError}>{message}</span>)}
           </div>
 
           <div style={styles.field}>
             <label style={styles.label}>{t[lang].confirmPassword}</label>
             <input
               type="password"
+              name="confirmPassword"
               required
               placeholder="••••••••"
               value={form.confirmPassword}
@@ -117,6 +130,7 @@ export default function RegisterPage({ lang, onRegisterSuccess, onGoToLogin }) {
               }
               style={styles.input}
             />
+            {errors.confirmPassword?.map((message) => <span key={message} style={styles.fieldError}>{message}</span>)}
           </div>
 
           <button type="submit" disabled={loading} style={styles.button}>
@@ -186,6 +200,7 @@ const styles = {
     fontSize: "0.95rem",
     outline: "none",
   },
+  fieldError: { color: "#dc2626", fontSize: "0.8rem" },
   button: {
     background: "#16a34a",
     color: "#fff",

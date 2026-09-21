@@ -5,11 +5,22 @@ import { cancelAppointment, deleteCancelledAppointment, getAppointments } from "
 
 export default function AppointmentsPage({ lang, user, onBack, onRequestAppointment }) {
   const [appointments, setAppointments] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
   const [notice, setNotice] = useState("");
 
   useEffect(() => {
-    setAppointments(getAppointments(user));
-  }, [user]);
+    setLoading(true);
+    setLoadError("");
+    try {
+      setAppointments(getAppointments(user));
+    } catch (error) {
+      console.error(error);
+      setLoadError(lang === "en" ? "Could not load appointments." : "No se pudieron cargar las citas.");
+    } finally {
+      setLoading(false);
+    }
+  }, [user, lang]);
 
   useEffect(() => {
     if (!notice) return undefined;
@@ -62,6 +73,9 @@ export default function AppointmentsPage({ lang, user, onBack, onRequestAppointm
             <span>＋</span>{copy.newAppointment}
           </button>
         </div>
+
+        {loading && <div role="status" style={{ padding: "16px 0" }}>{lang === "en" ? "Loading..." : "Cargando..."}</div>}
+        {loadError && <div role="alert" style={{ padding: "16px 0", color: "#dc2626" }}>{loadError}</div>}
 
         <header className="appointments-page-header">
           <span className="section-kicker">{copy.kicker}</span>

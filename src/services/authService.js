@@ -1,4 +1,4 @@
-const API_URL = import.meta.env.VITE_API_URL;
+import { api, ApiError } from "./api";
 
 const USERS_STORAGE_KEY = "medicita_users_list";
 
@@ -42,75 +42,32 @@ export async function loginUser(credentials) {
   const trimmedEmail = credentials.email?.trim();
   const trimmedPassword = credentials.password?.trim();
 
-  // 1. Verificación de Administrador
   if (trimmedEmail === "Admin" && trimmedPassword === "admin") {
-    return {
-      success: true,
-      user: ADMIN_USER,
-    };
+    return { success: true, user: ADMIN_USER };
   }
 
-  // 2. Intentar backend API si existe
   try {
-    const response = await fetch(`${API_URL}/login`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-      },
-      body: JSON.stringify(credentials),
-    });
-
-    if (response.ok) {
-      const data = await response.json();
-      return data;
-    }
+    return await api.post("/login", credentials);
   } catch (error) {
+    if (error instanceof ApiError && [401, 403, 422].includes(error.status)) throw error;
     console.warn("Backend no disponible, verificando usuarios de prueba...");
   }
 
-  // 3. Fallback en memoria / localStorage validando email y contraseña
   const users = getAllUsers();
-  const foundUser = users.find(
-    (u) =>
-      u.email.toLowerCase() === trimmedEmail.toLowerCase() &&
-      u.password === trimmedPassword
-  );
+  const foundUser = users.find((u) => u.email.toLowerCase() === trimmedEmail.toLowerCase() && u.password === trimmedPassword);
+  if (foundUser) return { success: true, user: { name: foundUser.name, email: foundUser.email, role: foundUser.role || "paciente" } };
 
-  if (foundUser) {
-    return {
-      success: true,
-      user: {
-        name: foundUser.name,
-        email: foundUser.email,
-        role: foundUser.role || "paciente",
-      },
-    };
-  }
-
-  // Si no coincide correo ni contraseña, deniega el acceso
   throw new Error("Credenciales incorrectas");
 }
 
 export async function registerUser(userData) {
   try {
-    const response = await fetch(`${API_URL}/register`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-      },
-      body: JSON.stringify(userData),
-    });
-
-    if (response.ok) {
-      return await response.json();
-    }
+    return await api.post("/register", userData);
   } catch (error) {
+    if (error instanceof ApiError && [401, 403, 422].includes(error.status)) throw error;
     console.warn("Backend no disponible, registrando de forma simulada...");
   }
 
-  // Registrar en localStorage localmente con rol 'paciente' por defecto
   const users = getAllUsers();
   const newUser = {
     id: `usr_${Date.now()}`,
@@ -122,9 +79,5 @@ export async function registerUser(userData) {
   };
 
   localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify([...users, newUser]));
-
-  return {
-    success: true,
-    user: { name: newUser.name, email: newUser.email, role: newUser.role },
-  };
+  return { success: true, user: { name: newUser.name, email: newUser.email, role: newUser.role } };
 }

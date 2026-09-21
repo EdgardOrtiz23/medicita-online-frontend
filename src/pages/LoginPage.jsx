@@ -1,9 +1,11 @@
 import { useState } from "react";
 import { loginUser } from "../services/authService";
+import { ApiError } from "../services/api";
 
 export default function LoginPage({ lang, onLoginSuccess, onGoToRegister }) {
   const [form, setForm] = useState({ email: "", password: "" });
   const [error, setError] = useState("");
+  const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
 
   const t = {
@@ -30,17 +32,21 @@ export default function LoginPage({ lang, onLoginSuccess, onGoToRegister }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
+    setErrors({});
     setLoading(true);
 
     try {
       const data = await loginUser(form);
       onLoginSuccess(data.user);
     } catch (err) {
-      setError(
-        lang === "es"
-          ? "Usuario o contraseña incorrectos"
-          : "Invalid username or password",
-      );
+      if (err instanceof ApiError && err.status === 422) {
+        setErrors(err.errors || {});
+        setError(Object.values(err.errors || {}).flat().join(" ") || err.message);
+      } else if (err instanceof ApiError && err.status === 403) {
+        setError(lang === "es" ? "No tienes permiso para iniciar sesión." : "You are not allowed to log in.");
+      } else {
+        setError(lang === "es" ? "Usuario o contraseña incorrectos" : "Invalid username or password");
+      }
     } finally {
       setLoading(false);
     }
@@ -65,6 +71,7 @@ export default function LoginPage({ lang, onLoginSuccess, onGoToRegister }) {
               onChange={(e) => setForm({ ...form, email: e.target.value })}
               style={styles.input}
             />
+            {errors.email?.map((message) => <span key={message} style={styles.fieldError}>{message}</span>)}
           </div>
 
           <div style={styles.field}>
@@ -77,6 +84,7 @@ export default function LoginPage({ lang, onLoginSuccess, onGoToRegister }) {
               onChange={(e) => setForm({ ...form, password: e.target.value })}
               style={styles.input}
             />
+            {errors.password?.map((message) => <span key={message} style={styles.fieldError}>{message}</span>)}
           </div>
 
           <button type="submit" disabled={loading} style={styles.button}>
@@ -146,6 +154,7 @@ const styles = {
     fontSize: "1rem",
     outline: "none",
   },
+  fieldError: { color: "#dc2626", fontSize: "0.8rem" },
   button: {
     background: "#0284c7",
     color: "#fff",
